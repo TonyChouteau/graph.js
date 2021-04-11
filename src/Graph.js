@@ -31,11 +31,14 @@
 			"scatter",
 			"stacked"*/
 		],
-		FONT_SIZE: 10,
 		FONT_DECORATION: '',
-		FONT_FAMILY: '',
+		FONT_SIZE: 10,
+		FONT_FAMILY: 'Arial',
 		ROUND: 2,
-		SCALE: 9,
+		SCALE: [9, 5],
+		BACKGROUND_COLOR: 'white',
+		LEGEND_COLOR: "black",
+		DRAW_AXIS: true,
 	};
 
 	//==============================
@@ -81,7 +84,7 @@
 		this.fontSize = size || this.DEFAULT.FONT_SIZE;
 		this.fontFamily = family || this.DEFAULT.FONT_FAMILY;
 
-		this.ctx.font = this.fontDecoration + ' ' + this.fontSize + ' ' + this.fontFamily;
+		this.ctx.font = this.fontDecoration + ' ' + this.fontSize + 'px ' + this.fontFamily;
 	};
 
 	/**
@@ -95,6 +98,11 @@
 
 		this.scale = options.scale || this.DEFAULT.SCALE;
 		this.round = options.round || this.DEFAULT.ROUND;
+
+		this.drawAxisLine = options.drawAxisLine || this.DEFAULT.DRAW_AXIS;
+		this.drawAxisArrow = options.drawAxisArrow || this.DEFAULT.DRAW_AXIS;
+		this.drawAxisLabel = options.drawAxisLabel || this.DEFAULT.DRAW_AXIS;
+
 		this.debug = options.debug || false;
 	};
 
@@ -106,14 +114,14 @@
 	 * @methods getBound(data: Array[])
 	 * Get bounds (max and min) of each dimension of the dataset.
 	 */
-	Graph.getBounds = function (data) {
+	Graph.computeData = function (options) {
 		this.bounds = [];
 		this.minMax = [];
-		for (let axis in data) {
+		for (let axis in options.data) {
 			let min = Infinity;
 			let max = -Infinity;
-			for (let id in data[axis]) {
-				let elt = data[axis][id];
+			for (let id in options.data[axis]) {
+				let elt = options.data[axis][id];
 				if (elt < min) {
 					min = elt;
 				}
@@ -130,6 +138,21 @@
 				max: Math.ceil(max / 10) * 10,
 			});
 		}
+		this.bounds = options.bounds || this.bounds;
+	};
+
+	Graph.getDrawingValues = function () {
+		let delta = this.measure('x');
+		let textWidth = Math.max(
+			this.measure(Math.floor(this.bounds[1].min * 10) / 10) + delta,
+			this.measure(Math.floor(this.bounds[1].max * 10) / 10) + delta
+		);
+		this.drawingValues = {
+			baseWidth: textWidth + delta,
+			baseHeight: this.fontSize,
+		};
+
+		this.drawingBounds = [[], []];
 	};
 
 	/**
@@ -155,40 +178,93 @@
 	//==============================
 
 	/**
-	 * @methods drawAxe(options)
-	 * Draw axe in the canvas.
+	 * @method background(options)
+	 * Draw background of canvas
+	 */
+	Graph.background = function (options) {
+		this.ctx.fillStyle = options.backgroundColor || this.DEFAULT.BACKGROUND_COLOR;
+		this.ctx.fillRect(0, 0, this.width, this.height);
+	};
+
+	/**
+	 * @methods drawXAxis(options)
+	 * Draw X axis in the canvas.
+	 */
+	Graph.drawXAxis = function (options) {
+		let baseWidth = this.drawingValues.baseWidth;
+		let baseHeight = this.drawingValues.baseHeight;
+
+		if (this.drawAxisLine) {
+			// Draw Line
+			this.ctx.beginPath();
+			this.ctx.moveTo(baseWidth - 5, this.height - baseHeight * (2 + 1 / 3));
+			this.ctx.lineTo(this.width - baseHeight, this.height - baseHeight * (2 + 1 / 3));
+			this.ctx.stroke();
+		}
+
+		if (this.drawAxisArrow) {
+			//Draw Arrow Spike
+			this.ctx.beginPath();
+			this.ctx.moveTo(this.width - baseHeight, this.height - baseHeight * (2 + 1 / 3));
+			this.ctx.lineTo(this.width - baseHeight * 1.5, this.height - baseHeight * (2 + 1 / 3) + this.fontSize * 0.5);
+			this.ctx.moveTo(this.width - baseHeight, this.height - baseHeight * (2 + 1 / 3));
+			this.ctx.lineTo(this.width - baseHeight * 1.5, this.height - baseHeight * (2 + 1 / 3) - this.fontSize * 0.5);
+			this.ctx.stroke();
+		}
+
+		if (this.drawAxisLabel) {
+			//Draw Legend
+			this.ctx.beginPath();
+			for (let i = 0; i < this.scale[0]; i++) {
+				let data = ((this.bounds[0].max - this.bounds[0].min) / (this.scale[0] - 1)) * i + this.bounds[0].min;
+				let x = baseWidth + ((this.width - baseHeight - baseWidth * 1.5) / (this.scale[0] - 1)) * i;
+				let dataXDelta = this.measure(data + '') / 2;
+				this.ctx.fillText(Math.floor(data * 10) / 10, x - dataXDelta, this.height - baseHeight);
+				this.ctx.moveTo(x, this.height - baseHeight * (2 + 1 / 3) - 5);
+				this.ctx.lineTo(x, this.height - baseHeight * (2 + 1 / 3) + 5);
+			}
+			this.ctx.stroke();
+		}
+	};
+
+	/**
+	 * @methods drawYAxis(options)
+	 * Draw Y axis in the canvas.
 	 */
 	Graph.drawYAxis = function (options) {
-		let delta = +this.measure('xx');
-		let textWidth = Math.max(
-			this.measure(Math.floor(this.bounds[1].min * 10) / 10) + delta,
-			this.measure(Math.floor(this.bounds[1].max * 10) / 10) + delta
-		);
+		let baseWidth = this.drawingValues.baseWidth;
+		let baseHeight = this.drawingValues.baseHeight;
 
-		// Draw Line
-		this.ctx.beginPath();
-		this.ctx.moveTo(textWidth + delta, this.height - this.fontSize * 3);
-		this.ctx.lineTo(textWidth + delta, this.fontSize);
-		this.ctx.stroke();
-
-		//Draw Arrow Spike
-		this.ctx.beginPath();
-		this.ctx.moveTo(textWidth + delta, this.fontSize);
-		this.ctx.lineTo(textWidth + delta + this.fontSize * 0.8, this.fontSize * 2);
-		this.ctx.moveTo(textWidth + delta, this.fontSize);
-		this.ctx.lineTo(textWidth + delta - this.fontSize * 0.8, this.fontSize * 2);
-		this.ctx.stroke();
-
-		//Draw Legend
-		this.ctx.beginPath();
-		for (let i = 0; i < this.scale; i++) {
-			let data = ((this.bounds[1].max - this.bounds[1].min) / (this.scale - 1)) * i + this.bounds[1].min;
-			let y = this.height - (this.fontSize * 3 + ((this.height - this.fontSize * 6) / (this.scale - 1)) * i);
-			this.ctx.fillText(Math.floor(data * 10) / 10, 0, y);
-			this.ctx.moveTo(textWidth + delta - 5, y - (this.fontSize * 1) / 3);
-			this.ctx.lineTo(textWidth + delta + 5, y - (this.fontSize * 1) / 3);
+		if (this.drawAxisLine) {
+			// Draw Line
+			this.ctx.beginPath();
+			this.ctx.moveTo(baseWidth, this.height - baseHeight * (2 + 1 / 3) + 5);
+			this.ctx.lineTo(baseWidth, baseHeight / 2);
+			this.ctx.stroke();
 		}
-		this.ctx.stroke();
+
+		if (this.drawAxisArrow) {
+			//Draw Arrow Spike
+			this.ctx.beginPath();
+			this.ctx.moveTo(baseWidth, baseHeight / 2);
+			this.ctx.lineTo(baseWidth + baseHeight * 0.5, baseHeight);
+			this.ctx.moveTo(baseWidth, baseHeight / 2);
+			this.ctx.lineTo(baseWidth - baseHeight * 0.5, baseHeight);
+			this.ctx.stroke();
+		}
+
+		if (this.drawAxisLabel) {
+			//Draw Legend
+			this.ctx.beginPath();
+			for (let i = 0; i < this.scale[1]; i++) {
+				let data = ((this.bounds[1].max - this.bounds[1].min) / (this.scale[1] - 1)) * i + this.bounds[1].min;
+				let y = this.height - (baseHeight * 2 + ((this.height - baseHeight * 4) / (this.scale[1] - 1)) * i);
+				this.ctx.fillText(Math.floor(data * 10) / 10, 0, y);
+				this.ctx.moveTo(baseWidth - 5, y - baseHeight / 3);
+				this.ctx.lineTo(baseWidth + 5, y - baseHeight / 3);
+			}
+			this.ctx.stroke();
+		}
 	};
 
 	/**
@@ -196,9 +272,12 @@
 	 * Draw legend in the canvas.
 	 */
 	Graph.drawLegend = function (options) {
-		this.getBounds(options.data);
-		this.bounds = options.bounds || this.bounds;
-		this.drawYAxis();
+
+		this.ctx.fillStyle = options.legendColor || this.DEFAULT.LEGEND_COLOR;
+		this.ctx.strokeStyle = options.legendColor || this.DEFAULT.LEGEND_COLOR;
+
+		this.drawYAxis(options);
+		this.drawXAxis(options);
 	};
 
 	//==============================
@@ -222,6 +301,9 @@
 
 		this.debug && console.log('Scatter Plot');
 
+		this.computeData(options);
+		this.getDrawingValues(options);
+		this.background(options);
 		this.drawLegend(options);
 
 		return this;
