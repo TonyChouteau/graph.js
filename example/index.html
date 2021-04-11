@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<title>Example</title>
+		<script src="../src/Graph.js" type="text/javascript"></script>
+	</head>
+	<body>
+		<script>
+			let data = [[], []];
+			for (let i=0; i<10; i++) {
+				data[0].push(i);
+				data[1].push((Math.random()*200-100));
+			}
+			console.log(data[1])
+
+			let g = G.scatter({
+				size: [500, 500],
+				data: data,
+				bounds: [{
+					min: 0,
+					max: 1
+				}, {
+					min: -100,
+					max: 100
+				}],
+				scale: 9
+			});
+		</script>
+	</body>
+</html>
